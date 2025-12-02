@@ -447,6 +447,183 @@
             color: var(--accent-primary);
         }
 
+        /* Settings Modal */
+        .settings-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .settings-content {
+            background: var(--bg-secondary);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 85vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 25px 30px;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            z-index: 10;
+        }
+
+        .settings-header h2 {
+            font-size: 1.5em;
+            color: var(--text-primary);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 5px 10px;
+            transition: color 0.3s ease;
+        }
+
+        .close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .settings-body {
+            padding: 20px 30px;
+        }
+
+        .settings-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .settings-section h3 {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: var(--accent-primary);
+        }
+
+        .setting-item {
+            margin-bottom: 15px;
+        }
+
+        .setting-item label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        .setting-item input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1em;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider-container input[type="range"] {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-primary);
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent-primary);
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .slider-container input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: var(--accent-primary);
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+
+        .slider-container span {
+            min-width: 50px;
+            text-align: right;
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        .settings-footer {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px 30px;
+            border-top: 1px solid var(--border-color);
+            position: sticky;
+            bottom: 0;
+            background: var(--bg-secondary);
+        }
+
+        .reset-btn, .save-btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .reset-btn {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .reset-btn:hover {
+            background: var(--error);
+            border-color: var(--error);
+        }
+
+        .save-btn {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .save-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .app-header {
@@ -463,6 +640,15 @@
 
             .login-container {
                 padding: 40px 30px;
+            }
+
+            .settings-content {
+                width: 95%;
+                max-height: 90vh;
+            }
+
+            .settings-header, .settings-body, .settings-footer {
+                padding: 15px 20px;
             }
         }
     </style>
@@ -495,10 +681,16 @@
                 <span>🎓</span>
                 <span>Study Assistant</span>
             </div>
-            <button class="calendar-btn" onclick="openCalendar()">
-                <span>📅</span>
-                <span>Calendar</span>
-            </button>
+            <div style="display: flex; gap: 10px;">
+                <button class="calendar-btn" onclick="toggleSettingsModal()">
+                    <span>⚙️</span>
+                    <span>Settings</span>
+                </button>
+                <button class="calendar-btn" onclick="openCalendar()">
+                    <span>📅</span>
+                    <span>Calendar</span>
+                </button>
+            </div>
         </header>
 
         <!-- Main Content -->
@@ -556,6 +748,104 @@
 
             <!-- Spinner -->
             <div class="spinner hidden" id="spinner"></div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="settings-modal" style="display: none;">
+        <div class="settings-content">
+            <div class="settings-header">
+                <h2>⚙️ Settings</h2>
+                <button class="close-btn" onclick="toggleSettingsModal()">✕</button>
+            </div>
+
+            <div class="settings-body">
+                <!-- Summary Settings -->
+                <div class="settings-section">
+                    <h3>📝 Summary</h3>
+                    <div class="setting-item">
+                        <label>Temperature (Creativity)</label>
+                        <div class="slider-container">
+                            <input type="range" id="summaryTemp" min="0" max="0.5" step="0.05" value="0.1"
+                                   oninput="updateSliderValue('summaryTemp', 'summaryTempValue')">
+                            <span id="summaryTempValue">0.10</span>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <label>Max Tokens (Length)</label>
+                        <input type="number" id="summaryTokens" min="200" max="1000" step="50" value="600">
+                    </div>
+                </div>
+
+                <!-- Flashcard Settings -->
+                <div class="settings-section">
+                    <h3>🗂️ Flashcards</h3>
+                    <div class="setting-item">
+                        <label>Temperature</label>
+                        <div class="slider-container">
+                            <input type="range" id="flashcardTemp" min="0" max="0.5" step="0.05" value="0.25"
+                                   oninput="updateSliderValue('flashcardTemp', 'flashcardTempValue')">
+                            <span id="flashcardTempValue">0.25</span>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <label>Max Cards</label>
+                        <input type="number" id="flashcardMax" min="5" max="50" step="5" value="20">
+                    </div>
+                </div>
+
+                <!-- Quiz Settings -->
+                <div class="settings-section">
+                    <h3>📋 Quiz</h3>
+                    <div class="setting-item">
+                        <label>Temperature</label>
+                        <div class="slider-container">
+                            <input type="range" id="quizTemp" min="0" max="0.5" step="0.05" value="0.2"
+                                   oninput="updateSliderValue('quizTemp', 'quizTempValue')">
+                            <span id="quizTempValue">0.20</span>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <label>Number of Questions</label>
+                        <input type="number" id="quizNum" min="5" max="20" step="5" value="10">
+                    </div>
+                </div>
+
+                <!-- Chatbot Settings -->
+                <div class="settings-section">
+                    <h3>💬 Chatbot</h3>
+                    <div class="setting-item">
+                        <label>Temperature (Conversational)</label>
+                        <div class="slider-container">
+                            <input type="range" id="chatbotTemp" min="0" max="1" step="0.1" value="0.7"
+                                   oninput="updateSliderValue('chatbotTemp', 'chatbotTempValue')">
+                            <span id="chatbotTempValue">0.70</span>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <label>Max Tokens</label>
+                        <input type="number" id="chatbotTokens" min="100" max="500" step="50" value="300">
+                    </div>
+                </div>
+
+                <!-- Retrieval Settings -->
+                <div class="settings-section">
+                    <h3>🔍 Retrieval (Advanced)</h3>
+                    <div class="setting-item">
+                        <label>Top K (Initial Chunks)</label>
+                        <input type="number" id="retrievalTopK" min="5" max="50" step="5" value="20">
+                    </div>
+                    <div class="setting-item">
+                        <label>Top M (After Reranking)</label>
+                        <input type="number" id="rerankerTopM" min="2" max="10" step="1" value="6">
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-footer">
+                <button class="reset-btn" onclick="resetUserSettings()">Reset to Defaults</button>
+                <button class="save-btn" onclick="saveSettingsFromUI()">Save Settings</button>
+            </div>
         </div>
     </div>
 

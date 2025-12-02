@@ -36,7 +36,9 @@ class QuizGenerator:
         context: List[Tuple[Dict, float]],
         question_type: str = "mcq",
         num_questions: int = 10,
-        difficulty: Optional[str] = None
+        difficulty: Optional[str] = None,
+        temperature: float = None,
+        max_tokens: int = None
     ) -> List[Dict[str, any]]:
         """
         Generate quiz questions from context.
@@ -46,10 +48,15 @@ class QuizGenerator:
             question_type: Type of question ("mcq", "short_answer", "numerical")
             num_questions: Number of questions to generate
             difficulty: Difficulty level ("easy", "medium", "hard") or None for mixed
+            temperature: Optional temperature override (None = use config default)
+            max_tokens: Optional max_tokens override (None = use config default)
 
         Returns:
             List of question dicts
         """
+        # Use provided parameters or fall back to config defaults
+        temp = temperature if temperature is not None else self.temperature
+
         # Format context
         context_text = self._format_context(context)
 
@@ -63,14 +70,20 @@ class QuizGenerator:
         tokens_per_question = 150
         safe_max_tokens = min(tokens_per_question * num_questions, 1500)
 
-        logger.info(f"Generating {num_questions} questions with max_tokens={safe_max_tokens}")
+        # Use provided max_tokens or calculated safe value
+        if max_tokens is not None:
+            tokens = min(max_tokens, safe_max_tokens)
+        else:
+            tokens = safe_max_tokens
+
+        logger.info(f"Generating {num_questions} questions with temperature={temp}, max_tokens={tokens}")
 
         # Generate
         response = self.llm.generate(
             prompt=prompt,
             system_prompt=system_prompt,
-            temperature=self.temperature,
-            max_tokens=safe_max_tokens
+            temperature=temp,
+            max_tokens=tokens
         )
 
         # Parse questions

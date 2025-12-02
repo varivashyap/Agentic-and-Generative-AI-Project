@@ -10,8 +10,14 @@ from abc import ABC, abstractmethod
 
 from src.pipeline import StudyAssistantPipeline
 from mcp_server.session_manager import SessionManager, DocumentSession
+from mcp_server.settings_manager import UserSettings
 
 logger = logging.getLogger(__name__)
+
+
+def extract_user_settings(parameters: Dict[str, Any]) -> Optional[UserSettings]:
+    """Extract user settings from parameters if present."""
+    return parameters.get('user_settings')
 
 
 class BaseRequestHandler(ABC):
@@ -40,15 +46,27 @@ class BaseRequestHandler(ABC):
 
 class SummaryRequestHandler(BaseRequestHandler):
     """Handler for summary generation requests."""
-    
+
     def handle(self, pipeline: StudyAssistantPipeline, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Generate summary from ingested content."""
         query = parameters.get('query')
         scale = parameters.get('scale', 'paragraph')
-        
-        logger.info(f"Generating summary with scale={scale}")
-        summary = pipeline.generate_summaries(query=query, scale=scale)
-        
+
+        # Extract user settings if provided
+        user_settings = extract_user_settings(parameters)
+
+        # Use user settings or defaults
+        temperature = user_settings.summary_temperature if user_settings else None
+        max_tokens = user_settings.summary_max_tokens if user_settings else None
+
+        logger.info(f"Generating summary with scale={scale}, temp={temperature}, tokens={max_tokens}")
+        summary = pipeline.generate_summaries(
+            query=query,
+            scale=scale,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+
         return {
             'summary': summary,
             'scale': scale,
@@ -70,20 +88,30 @@ class SummaryRequestHandler(BaseRequestHandler):
 
 class FlashcardsRequestHandler(BaseRequestHandler):
     """Handler for flashcard generation requests."""
-    
+
     def handle(self, pipeline: StudyAssistantPipeline, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """Generate flashcards from ingested content."""
         query = parameters.get('query')
         card_type = parameters.get('card_type', 'definition')
         max_cards = parameters.get('max_cards', 20)
-        
+
+        # Extract user settings if provided
+        user_settings = extract_user_settings(parameters)
+
+        # Use user settings or defaults (None = use config defaults)
+        temperature = user_settings.flashcard_temperature if user_settings else None
+        # Override max_cards if user has custom setting
+        if user_settings:
+            max_cards = user_settings.flashcard_max_cards
+
         logger.info(f"Generating {max_cards} flashcards of type={card_type}")
         flashcards = pipeline.generate_flashcards(
             query=query,
             card_type=card_type,
-            max_cards=max_cards
+            max_cards=max_cards,
+            temperature=temperature
         )
-        
+
         return {
             'flashcards': flashcards,
             'count': len(flashcards),
@@ -113,11 +141,23 @@ class QuizRequestHandler(BaseRequestHandler):
         question_type = parameters.get('question_type', 'mcq')
         num_questions = parameters.get('num_questions', 10)
 
+        # Extract user settings if provided
+        user_settings = extract_user_settings(parameters)
+
+        # Use user settings or defaults (None = use config defaults)
+        temperature = user_settings.quiz_temperature if user_settings else None
+        max_tokens = user_settings.quiz_max_tokens if user_settings else None
+        # Override num_questions if user has custom setting
+        if user_settings:
+            num_questions = user_settings.quiz_num_questions
+
         logger.info(f"Generating {num_questions} questions of type={question_type}")
         questions = pipeline.generate_quizzes(
             query=query,
             question_type=question_type,
-            num_questions=num_questions
+            num_questions=num_questions,
+            temperature=temperature,
+            max_tokens=max_tokens
         )
 
         return {
@@ -158,6 +198,13 @@ class ChatbotRequestHandler(BaseRequestHandler):
         message = parameters.get('message', '')
         session_id = parameters.get('session_id', 'default')
         max_history = parameters.get('max_history', 5)
+
+        # Extract user settings if provided
+        user_settings = extract_user_settings(parameters)
+
+        # Use user settings or defaults (None = use config defaults)
+        temperature = user_settings.chatbot_temperature if user_settings else 0.7
+        max_tokens = user_settings.chatbot_max_tokens if user_settings else 300
 
         if not message:
             return {
@@ -209,13 +256,13 @@ User question: {message}
 Please provide a helpful answer based on the context above."""
 
         # Generate response using LLM
-        # Reduced max_tokens to 300 to prevent memory issues on 4GB GPU
+        # Use user settings or defaults
         try:
             response = pipeline.llm_client.generate(
                 prompt=user_prompt,
                 system_prompt=system_prompt,
-                temperature=0.7,
-                max_tokens=300
+                temperature=temperature,
+                max_tokens=max_tokens
             )
 
             # Store in conversation history

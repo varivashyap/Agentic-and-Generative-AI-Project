@@ -1,0 +1,23 @@
+{
+  "default": {
+    "temperature": 0.2,
+    "max_tokens": 512,
+    "top_p": 0.9,
+    "summary_temperature": 0.1,
+    "summary_max_tokens": 600,
+    "summary_scale": "paragraph",
+    "flashcard_temperature": 0.25,
+    "flashcard_max_tokens": 1500,
+    "flashcard_max_cards": 4,
+    "quiz_temperature": 0.2,
+    "quiz_max_tokens": 200,
+    "quiz_num_questions": 3,
+    "chatbot_temperature": 0.7,
+    "chatbot_max_tokens": 300,
+    "chatbot_max_history": 5,
+    "retrieval_top_k": 20,
+    "reranker_top_m": 6,
+    "chunk_size_tokens": 300,
+    "chunk_overlap_tokens": 60
+  }
+}

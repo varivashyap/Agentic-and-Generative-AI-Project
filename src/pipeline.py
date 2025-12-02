@@ -126,67 +126,83 @@ class StudyAssistantPipeline:
     def generate_summaries(
         self,
         query: Optional[str] = None,
-        scale: str = "paragraph"
+        scale: str = "paragraph",
+        temperature: float = None,
+        max_tokens: int = None
     ) -> str:
         """
         Generate summary from ingested content.
-        
+
         Args:
             query: Optional query to focus summary (uses general summary if None)
             scale: Summary scale ("sentence", "paragraph", "section")
-            
+            temperature: Override temperature (uses config default if None)
+            max_tokens: Override max_tokens (uses config default if None)
+
         Returns:
             Generated summary
         """
         logger.info(f"Generating {scale} summary")
-        
+
         # Retrieve context
         if query is None:
             query = "Summarize the main concepts and key information"
-        
+
         context = self._retrieve_context(query)
-        
-        # Generate summary
-        summary = self.summary_generator.generate(context, scale)
-        
+
+        # Generate summary (pass through override parameters)
+        summary = self.summary_generator.generate(
+            context,
+            scale,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+
         # Validate
         validation = self.validator.validate_summary(summary, context)
         if not validation['is_valid']:
             logger.warning(f"Summary validation warnings: {validation['warnings']}")
-        
+
         # Record metrics
         self.metrics.record_factuality(validation['source_containment'], 'summary')
-        
+
         return summary
     
     def generate_flashcards(
         self,
         query: Optional[str] = None,
         card_type: str = "definition",
-        max_cards: int = 50
+        max_cards: int = 50,
+        temperature: float = None
     ) -> List[Dict[str, str]]:
         """
         Generate flashcards from ingested content.
-        
+
         Args:
             query: Optional query to focus flashcards
             card_type: Type of flashcard
             max_cards: Maximum number of cards
-            
+            temperature: Optional temperature override (None = use config default)
+
         Returns:
             List of flashcard dicts
         """
         logger.info(f"Generating {card_type} flashcards")
-        
+
         # Retrieve context
         if query is None:
             query = "Extract key concepts, definitions, and facts"
-        
+
         context = self._retrieve_context(query, top_k=30)
-        
-        # Generate flashcards
-        flashcards = self.flashcard_generator.generate(context, card_type, max_cards)
-        
+
+        # Generate flashcards (pass through override parameters)
+        flashcards = self.flashcard_generator.generate(
+            context,
+            card_type,
+            max_cards,
+            temperature=temperature
+        )
+
         logger.info(f"Generated {len(flashcards)} flashcards")
         return flashcards
     
@@ -194,30 +210,40 @@ class StudyAssistantPipeline:
         self,
         query: Optional[str] = None,
         question_type: str = "mcq",
-        num_questions: int = 10
+        num_questions: int = 10,
+        temperature: float = None,
+        max_tokens: int = None
     ) -> List[Dict[str, any]]:
         """
         Generate quiz questions from ingested content.
-        
+
         Args:
             query: Optional query to focus questions
             question_type: Type of question
             num_questions: Number of questions
-            
+            temperature: Optional temperature override (None = use config default)
+            max_tokens: Optional max_tokens override (None = use config default)
+
         Returns:
             List of question dicts
         """
         logger.info(f"Generating {question_type} questions")
-        
+
         # Retrieve context
         if query is None:
             query = "Generate assessment questions covering key concepts"
-        
+
         context = self._retrieve_context(query, top_k=30)
-        
-        # Generate questions
-        questions = self.quiz_generator.generate(context, question_type, num_questions)
-        
+
+        # Generate questions (pass through override parameters)
+        questions = self.quiz_generator.generate(
+            context,
+            question_type,
+            num_questions,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+
         logger.info(f"Generated {len(questions)} questions")
         return questions
     

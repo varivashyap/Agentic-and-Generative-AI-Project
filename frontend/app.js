@@ -6,6 +6,7 @@ let uploadedFileId = null;
 let selectedFeature = null;
 let isAuthenticated = false;
 let chatHistory = [];
+let userSettings = null;  // User settings loaded from backend
 
 // DOM Elements
 const loginPage = document.getElementById('loginPage');
@@ -502,4 +503,144 @@ function showStatus(type, message) {
 function showSpinner(show) {
     spinner.classList.toggle('hidden', !show);
 }
+
+// Settings Management
+async function loadUserSettings() {
+    try {
+        const response = await fetch(`${API_URL}/settings?user_id=default`);
+        const data = await response.json();
+
+        if (data.success) {
+            userSettings = data.settings;
+            console.log('Loaded user settings:', userSettings);
+
+            // Update UI if settings modal is open
+            if (document.getElementById('settingsModal')) {
+                populateSettingsUI(userSettings);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load settings:', error);
+    }
+}
+
+async function saveUserSettings(settings) {
+    try {
+        const response = await fetch(`${API_URL}/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: 'default',
+                settings: settings
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            userSettings = data.settings;
+            showStatus('success', 'Settings saved successfully!');
+            return true;
+        } else {
+            showStatus('error', 'Failed to save settings');
+            return false;
+        }
+    } catch (error) {
+        console.error('Failed to save settings:', error);
+        showStatus('error', 'Failed to save settings');
+        return false;
+    }
+}
+
+async function resetUserSettings() {
+    try {
+        const response = await fetch(`${API_URL}/settings/reset`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: 'default' })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            userSettings = data.settings;
+            populateSettingsUI(userSettings);
+            showStatus('success', 'Settings reset to defaults!');
+            return true;
+        }
+    } catch (error) {
+        console.error('Failed to reset settings:', error);
+        showStatus('error', 'Failed to reset settings');
+        return false;
+    }
+}
+
+function toggleSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    if (modal.style.display === 'flex') {
+        modal.style.display = 'none';
+    } else {
+        modal.style.display = 'flex';
+        if (!userSettings) {
+            loadUserSettings();
+        } else {
+            populateSettingsUI(userSettings);
+        }
+    }
+}
+
+function populateSettingsUI(settings) {
+    // Summary settings
+    document.getElementById('summaryTemp').value = settings.summary_temperature || 0.1;
+    document.getElementById('summaryTempValue').textContent = (settings.summary_temperature || 0.1).toFixed(2);
+    document.getElementById('summaryTokens').value = settings.summary_max_tokens || 600;
+
+    // Flashcard settings
+    document.getElementById('flashcardTemp').value = settings.flashcard_temperature || 0.25;
+    document.getElementById('flashcardTempValue').textContent = (settings.flashcard_temperature || 0.25).toFixed(2);
+    document.getElementById('flashcardMax').value = settings.flashcard_max_cards || 20;
+
+    // Quiz settings
+    document.getElementById('quizTemp').value = settings.quiz_temperature || 0.2;
+    document.getElementById('quizTempValue').textContent = (settings.quiz_temperature || 0.2).toFixed(2);
+    document.getElementById('quizNum').value = settings.quiz_num_questions || 10;
+
+    // Chatbot settings
+    document.getElementById('chatbotTemp').value = settings.chatbot_temperature || 0.7;
+    document.getElementById('chatbotTempValue').textContent = (settings.chatbot_temperature || 0.7).toFixed(2);
+    document.getElementById('chatbotTokens').value = settings.chatbot_max_tokens || 300;
+
+    // Retrieval settings
+    document.getElementById('retrievalTopK').value = settings.retrieval_top_k || 20;
+    document.getElementById('rerankerTopM').value = settings.reranker_top_m || 6;
+}
+
+function saveSettingsFromUI() {
+    const settings = {
+        summary_temperature: parseFloat(document.getElementById('summaryTemp').value),
+        summary_max_tokens: parseInt(document.getElementById('summaryTokens').value),
+        flashcard_temperature: parseFloat(document.getElementById('flashcardTemp').value),
+        flashcard_max_cards: parseInt(document.getElementById('flashcardMax').value),
+        quiz_temperature: parseFloat(document.getElementById('quizTemp').value),
+        quiz_num_questions: parseInt(document.getElementById('quizNum').value),
+        chatbot_temperature: parseFloat(document.getElementById('chatbotTemp').value),
+        chatbot_max_tokens: parseInt(document.getElementById('chatbotTokens').value),
+        retrieval_top_k: parseInt(document.getElementById('retrievalTopK').value),
+        reranker_top_m: parseInt(document.getElementById('rerankerTopM').value)
+    };
+
+    saveUserSettings(settings);
+}
+
+// Update slider value displays
+function updateSliderValue(sliderId, valueId) {
+    const slider = document.getElementById(sliderId);
+    const valueDisplay = document.getElementById(valueId);
+    valueDisplay.textContent = parseFloat(slider.value).toFixed(2);
+}
+
+// Load settings on app start
+window.addEventListener('DOMContentLoaded', () => {
+    loadUserSettings();
+});
 

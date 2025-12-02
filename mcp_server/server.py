@@ -21,6 +21,7 @@ from src.pipeline import StudyAssistantPipeline
 from mcp_server.handlers import RequestHandler
 from mcp_server.models import ModelRegistry
 from mcp_server.session_manager import SessionManager
+from mcp_server.settings_manager import get_settings_manager
 from mcp_server.google_auth import GoogleAuthManager
 from mcp_server.google_calendar import GoogleCalendarService
 
@@ -49,6 +50,7 @@ UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 # Initialize components
 model_registry = ModelRegistry()
 session_manager = SessionManager()
+settings_manager = get_settings_manager()
 request_handler = RequestHandler(model_registry, session_manager)
 
 # Initialize Google Auth (optional - only if credentials file exists)
@@ -89,6 +91,103 @@ def list_request_types():
     return jsonify({
         'request_types': request_handler.list_request_types()
     })
+
+
+@app.route('/settings/schema', methods=['GET'])
+def get_settings_schema():
+    """Get schema for all available settings (for building UI)."""
+    try:
+        schema = settings_manager.get_settings_schema()
+        return jsonify({
+            'success': True,
+            'schema': schema
+        })
+    except Exception as e:
+        logger.error(f"Error getting settings schema: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/settings', methods=['GET'])
+def get_user_settings():
+    """Get current settings for a user."""
+    try:
+        user_id = request.args.get('user_id', 'default')
+        settings = settings_manager.get_settings(user_id)
+        has_custom = settings_manager.has_custom_settings(user_id)
+
+        return jsonify({
+            'success': True,
+            'user_id': user_id,
+            'settings': settings.to_dict(),
+            'has_custom_settings': has_custom,
+            'using_defaults': not has_custom
+        })
+    except Exception as e:
+        logger.error(f"Error getting user settings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/settings', methods=['POST'])
+def update_user_settings():
+    """
+    Update settings for a user.
+
+    Request body:
+    {
+        "user_id": "user123",  // optional, defaults to "default"
+        "settings": {
+            "temperature": 0.5,
+            "max_tokens": 800,
+            ...
+        }
+    }
+    """
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id', 'default')
+        settings_update = data.get('settings', {})
+
+        if not settings_update:
+            return jsonify({'error': 'No settings provided'}), 400
+
+        updated_settings = settings_manager.update_settings(user_id, settings_update)
+
+        return jsonify({
+            'success': True,
+            'user_id': user_id,
+            'settings': updated_settings.to_dict(),
+            'message': f'Updated {len(settings_update)} settings'
+        })
+    except Exception as e:
+        logger.error(f"Error updating user settings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/settings/reset', methods=['POST'])
+def reset_user_settings():
+    """
+    Reset user settings to defaults.
+
+    Request body:
+    {
+        "user_id": "user123"  // optional, defaults to "default"
+    }
+    """
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id', 'default')
+
+        default_settings = settings_manager.reset_settings(user_id)
+
+        return jsonify({
+            'success': True,
+            'user_id': user_id,
+            'settings': default_settings.to_dict(),
+            'message': 'Settings reset to defaults'
+        })
+    except Exception as e:
+        logger.error(f"Error resetting user settings: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/upload', methods=['POST'])
@@ -147,33 +246,45 @@ def process_document():
     """
     try:
         data = request.get_json()
-        
+
         if not data:
             return jsonify({'error': 'No JSON data provided'}), 400
-        
+
         file_id = data.get('file_id')
         request_type = data.get('request_type')
         model_name = data.get('model', 'default')
         parameters = data.get('parameters', {})
-        
+        user_id = data.get('user_id', 'default')  # Get user_id for settings
+
         if not file_id:
             return jsonify({'error': 'file_id is required'}), 400
-        
+
         if not request_type:
             return jsonify({'error': 'request_type is required'}), 400
-        
+
         # Validate file exists
         filepath = UPLOAD_FOLDER / file_id
         if not filepath.exists():
             return jsonify({'error': 'File not found'}), 404
-        
+
+        # Get user settings (will use defaults if user hasn't customized)
+        user_settings = settings_manager.get_settings(user_id)
+
+        # Merge user settings into parameters (user settings override defaults)
+        # This allows per-request customization while respecting user preferences
+        merged_parameters = {**parameters}  # Start with request parameters
+
+        # Add user settings to parameters if not already specified
+        if 'user_settings' not in merged_parameters:
+            merged_parameters['user_settings'] = user_settings
+
         # Process request (pass file_id for session management)
         result = request_handler.handle_request(
             file_id=file_id,
             filepath=str(filepath),
             request_type=request_type,
             model_name=model_name,
-            parameters=parameters
+            parameters=merged_parameters
         )
 
         return jsonify({

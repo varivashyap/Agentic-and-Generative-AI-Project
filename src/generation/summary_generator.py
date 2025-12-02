@@ -28,38 +28,46 @@ class SummaryGenerator:
     def generate(
         self,
         context: List[Tuple[Dict, float]],
-        scale: str = "paragraph"
+        scale: str = "paragraph",
+        temperature: float = None,
+        max_tokens: int = None
     ) -> str:
         """
         Generate summary from retrieved context.
-        
+
         Args:
             context: List of (document, score) tuples from retrieval
             scale: Summary scale ("sentence", "paragraph", or "section")
-            
+            temperature: Override temperature (uses config default if None)
+            max_tokens: Override max_tokens (uses config default if None)
+
         Returns:
             Generated summary
         """
         if scale not in self.scales:
             logger.warning(f"Unknown scale {scale}, using 'paragraph'")
             scale = "paragraph"
-        
+
+        # Use provided parameters or fall back to config defaults
+        temp = temperature if temperature is not None else self.temperature
+        tokens = max_tokens if max_tokens is not None else self.max_tokens
+
         # Combine context
         context_text = self._format_context(context)
-        
+
         # Create prompt
         prompt = self._create_prompt(context_text, scale)
         system_prompt = self._get_system_prompt()
-        
+
         # Generate
         summary = self.llm.generate(
             prompt=prompt,
             system_prompt=system_prompt,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens
+            temperature=temp,
+            max_tokens=tokens
         )
-        
-        logger.info(f"Generated {scale} summary ({len(summary)} chars)")
+
+        logger.info(f"Generated {scale} summary ({len(summary)} chars) [temp={temp}, tokens={tokens}]")
         return summary.strip()
     
     def generate_multi_scale(

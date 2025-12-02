@@ -32,36 +32,41 @@ class FlashcardGenerator:
         self,
         context: List[Tuple[Dict, float]],
         card_type: str = "definition",
-        max_cards: Optional[int] = None
+        max_cards: Optional[int] = None,
+        temperature: float = None
     ) -> List[Dict[str, str]]:
         """
         Generate flashcards from context.
-        
+
         Args:
             context: List of (document, score) tuples
             card_type: Type of flashcard ("definition", "concept", "cloze")
             max_cards: Maximum number of cards (uses config default if None)
-            
+            temperature: Optional temperature override (None = use config default)
+
         Returns:
             List of flashcard dicts with 'front', 'back', and 'type' keys
         """
         if max_cards is None:
             max_cards = self.max_cards
-        
+
+        # Use provided temperature or fall back to config default
+        temp = temperature if temperature is not None else self.temperature
+
         # Format context
         context_text = self._format_context(context)
-        
+
         # Create prompt
         prompt = self._create_prompt(context_text, card_type, max_cards)
         system_prompt = self._get_system_prompt()
-        
+
         # Generate
         actual_max_tokens = self.max_tokens * 3  # Allow for multiple cards
-        logger.info(f"Generating flashcards with max_tokens={actual_max_tokens}")
+        logger.info(f"Generating flashcards with temperature={temp}, max_tokens={actual_max_tokens}")
         response = self.llm.generate(
             prompt=prompt,
             system_prompt=system_prompt,
-            temperature=self.temperature,
+            temperature=temp,
             max_tokens=actual_max_tokens
         )
         logger.debug(f"LLM response length: {len(response)} chars")
