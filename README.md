@@ -89,23 +89,7 @@ Training Data → Finetuning (LoRA/QLoRA) → Improved Model
 
 ## 🚀 Quick Start
 
-### Option 1: MCP Server (Recommended - Web Interface)
-
-```bash
-# 1. Setup (one-time)
-./setup_mcp_server.sh
-
-# 2. Start the MCP server
-./start_mcp_server.sh
-
-# 3. Start the frontend (in new terminal)
-./start_frontend.sh
-
-# 4. Open browser to http://localhost:8080
-# Upload documents, generate study materials!
-```
-
-### Option 2: Python API (For Developers)
+### Model Setup (Local Models)
 
 ```bash
 # 1. Install dependencies
@@ -129,6 +113,22 @@ huggingface-cli download Qwen/Qwen2-1.5B-Instruct-GGUF \
 huggingface-cli download TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF \
   tinyllama-1.1b-chat.Q4_K_M.gguf \
   --local-dir models/ --local-dir-use-symlinks False
+
+### MCP Server (Recommended - Web Interface)
+
+```bash
+# 1. Setup (one-time)
+./setup_mcp_server.sh
+
+# 2. Start the MCP server
+./start_mcp_server.sh
+
+# 3. Start the frontend (in new terminal)
+./start_frontend.sh
+
+# 4. Open browser to http://localhost:8080
+# Upload documents, generate study materials!
+```
 
 # 3. Use the Python API (see below)
 ```
