@@ -584,6 +584,37 @@
             font-weight: 600;
         }
 
+        .model-select {
+            width: 100%;
+            padding: 12px 15px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .model-select:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .model-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .model-info {
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .model-info strong {
+            color: var(--accent-primary);
+        }
+
         .settings-footer {
             display: flex;
             justify-content: space-between;
@@ -765,6 +796,25 @@
             </div>
 
             <div class="settings-body">
+                <!-- Model Selection -->
+                <div class="settings-section">
+                    <h3>🤖 Model Selection</h3>
+                    <div class="setting-item">
+                        <label>LLM Model</label>
+                        <select id="selectedModel" class="model-select">
+                            <option value="mistral-7b-instruct-v0.2.Q4_K_M">Mistral 7B (Default) - Best Quality</option>
+                            <option value="qwen2-1.5b-instruct.Q4_K_M">Qwen2 1.5B - Fast & Efficient</option>
+                            <option value="tinyllama-1.1b-chat.Q4_K_M">TinyLlama 1.1B - Ultra Fast</option>
+                        </select>
+                        <small style="color: var(--text-secondary); display: block; margin-top: 8px;">
+                            💡 Smaller models are faster but may have lower quality. Larger models provide better results but are slower.
+                        </small>
+                    </div>
+                    <div id="modelInfo" class="model-info" style="margin-top: 15px; padding: 15px; background: rgba(59, 130, 246, 0.1); border-radius: 10px; border: 1px solid rgba(59, 130, 246, 0.3);">
+                        <!-- Model info will be populated by JavaScript -->
+                    </div>
+                </div>
+
                 <!-- Summary Settings -->
                 <div class="settings-section">
                     <h3>📝 Summary</h3>
@@ -779,6 +829,12 @@
                     <div class="setting-item">
                         <label>Max Tokens (Length)</label>
                         <input type="number" id="summaryTokens" min="200" max="1000" step="50" value="600">
+                    </div>
+                    <div class="setting-item">
+                        <label>System Prompt (Advanced)
+                            <small style="color: var(--text-secondary);">Customize AI behavior for summaries</small>
+                        </label>
+                        <textarea id="summarySystemPrompt" rows="4" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: monospace; font-size: 12px;"></textarea>
                     </div>
                 </div>
 
@@ -797,6 +853,12 @@
                         <label>Max Cards</label>
                         <input type="number" id="flashcardMax" min="5" max="50" step="5" value="20">
                     </div>
+                    <div class="setting-item">
+                        <label>System Prompt (Advanced)
+                            <small style="color: var(--text-secondary);">Customize AI behavior for flashcards</small>
+                        </label>
+                        <textarea id="flashcardSystemPrompt" rows="4" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: monospace; font-size: 12px;"></textarea>
+                    </div>
                 </div>
 
                 <!-- Quiz Settings -->
@@ -814,6 +876,12 @@
                         <label>Number of Questions</label>
                         <input type="number" id="quizNum" min="5" max="20" step="5" value="10">
                     </div>
+                    <div class="setting-item">
+                        <label>System Prompt (Advanced)
+                            <small style="color: var(--text-secondary);">Customize AI behavior for quizzes</small>
+                        </label>
+                        <textarea id="quizSystemPrompt" rows="4" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: monospace; font-size: 12px;"></textarea>
+                    </div>
                 </div>
 
                 <!-- Chatbot Settings -->
@@ -830,6 +898,12 @@
                     <div class="setting-item">
                         <label>Max Tokens</label>
                         <input type="number" id="chatbotTokens" min="100" max="500" step="50" value="300">
+                    </div>
+                    <div class="setting-item">
+                        <label>System Prompt (Advanced)
+                            <small style="color: var(--text-secondary);">Customize AI behavior for chatbot</small>
+                        </label>
+                        <textarea id="chatbotSystemPrompt" rows="4" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: var(--text-primary); font-family: monospace; font-size: 12px;"></textarea>
                     </div>
                 </div>
 

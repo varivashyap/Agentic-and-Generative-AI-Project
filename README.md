@@ -34,6 +34,9 @@ A high-performance RAG-based study assistant that runs entirely on your machine 
 - **Session Management**: Automatic caching and deduplication
 - **4GB GPU Optimized**: Memory-safe generation for limited VRAM
 - **Modular Design**: Easy to extend with new models and request types
+- **Multi-Model Support**: Switch between Mistral 7B, Qwen2 1.5B, TinyLlama 1.1B
+- **Custom System Prompts**: Personalize AI behavior for each component
+- **User Settings**: Configurable temperature, max tokens, and more
 
 ### 🧠 Advanced Features
 - **Model Finetuning**: LoRA/QLoRA finetuning optimized for 4GB GPU
@@ -43,7 +46,7 @@ A high-performance RAG-based study assistant that runs entirely on your machine 
 - **Web Search Integration**: DuckDuckGo search for question enrichment (optional)
 
 ### 🚀 Technology Stack (All Open-Source)
-- **LLM**: llama-cpp-python (Mistral, Llama, Phi-3, Gemma)
+- **LLM**: llama-cpp-python 0.3.16+ (Mistral 7B, Qwen2 1.5B, TinyLlama 1.1B)
 - **Embeddings**: sentence-transformers (all-MiniLM, all-mpnet)
 - **OCR**: PaddleOCR + Tesseract
 - **ASR**: OpenAI Whisper (open-source)
@@ -108,11 +111,23 @@ Training Data → Finetuning (LoRA/QLoRA) → Improved Model
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Download model (Mistral-7B)
+# 2. Download models (choose one or all)
 mkdir -p models
 pip install huggingface-hub
+
+# Mistral 7B (Default - Best Quality)
 huggingface-cli download TheBloke/Mistral-7B-Instruct-v0.2-GGUF \
   mistral-7b-instruct-v0.2.Q4_K_M.gguf \
+  --local-dir models/ --local-dir-use-symlinks False
+
+# Qwen2 1.5B (Fast & Efficient)
+huggingface-cli download Qwen/Qwen2-1.5B-Instruct-GGUF \
+  qwen2-1.5b-instruct.Q4_K_M.gguf \
+  --local-dir models/ --local-dir-use-symlinks False
+
+# TinyLlama 1.1B (Ultra Fast)
+huggingface-cli download TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF \
+  tinyllama-1.1b-chat.Q4_K_M.gguf \
   --local-dir models/ --local-dir-use-symlinks False
 
 # 3. Use the Python API (see below)
@@ -128,14 +143,18 @@ huggingface-cli download TheBloke/Mistral-7B-Instruct-v0.2-GGUF \
 2. Start the frontend: `./start_frontend.sh`
 3. Open http://localhost:8080
 4. **Sign in with Google** (first time only)
-5. Upload PDF or audio file (drag & drop or click)
-6. Select feature:
+5. **Configure Settings** (⚙️ icon):
+   - Select AI model (Mistral 7B, Qwen2 1.5B, or TinyLlama 1.1B)
+   - Adjust temperature, max tokens for each component
+   - Customize system prompts for personalized AI behavior
+6. Upload PDF or audio file (drag & drop or click)
+7. Select feature:
    - **📝 Summary**: Generate document summary
    - **❓ Quiz**: Generate 10 MCQ questions
    - **🎴 Flashcards**: Generate study flashcards
    - **💬 Chatbot**: Ask questions about your document
    - **📅 Calendar**: View/manage Google Calendar events
-7. View results in the modern dark-themed interface
+8. View results in the modern dark-themed interface
 
 **Chatbot Mode**: Interactive Q&A about your documents
 - Upload a document first
@@ -240,8 +259,11 @@ study-assistant/
 
 - **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Complete setup from scratch to running
 - **[MCP_SERVER.md](MCP_SERVER.md)** - MCP server API and web interface
+- **[PIPELINE_ARCHITECTURE_REPORT.md](PIPELINE_ARCHITECTURE_REPORT.md)** - Detailed pipeline architecture and request flow
 - **[PROJECT_SPECIFICATION.md](PROJECT_SPECIFICATION.md)** - Pipeline architecture and technical details
 - **[PROJECT_STATUS.md](PROJECT_STATUS.md)** - Implementation status and recent fixes
+- **[CUSTOM_PROMPTS_COMPLETE.md](CUSTOM_PROMPTS_COMPLETE.md)** - Custom system prompts feature documentation
+- **[MODEL_UPDATE_SUMMARY.md](MODEL_UPDATE_SUMMARY.md)** - Multi-model support documentation
 
 ## 💾 System Requirements
 

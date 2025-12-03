@@ -28,7 +28,7 @@ yake==0.4.8
 # REMOVED: anthropic (paid API)
 
 # Local LLM Inference (Kaggle-compatible models)
-llama-cpp-python==0.2.27  # For GGUF quantized models (CPU/GPU)
+llama-cpp-python>=0.3.16  # For GGUF quantized models (CPU/GPU) - Required for Qwen2 support
 huggingface-hub==0.19.4  # For downloading models
 
 # Vector Store & Search

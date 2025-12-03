@@ -60,7 +60,7 @@ Most models download automatically on first use:
 
 ### Manual LLM Download (One-time)
 
-The LLM model needs to be downloaded manually:
+The LLM models need to be downloaded manually. You can download one or all three:
 
 ```bash
 # Create models directory
@@ -69,51 +69,56 @@ mkdir -p models
 # Install HuggingFace CLI
 pip install huggingface-hub
 
-# Download Mistral-7B-Instruct (recommended, ~4GB)
+# Download Mistral-7B-Instruct (RECOMMENDED - Best Quality, ~4.1GB)
 huggingface-cli download TheBloke/Mistral-7B-Instruct-v0.2-GGUF \
   mistral-7b-instruct-v0.2.Q4_K_M.gguf \
   --local-dir models/ \
   --local-dir-use-symlinks False
+
+# Download Qwen2-1.5B (Fast & Efficient, ~941MB)
+huggingface-cli download Qwen/Qwen2-1.5B-Instruct-GGUF \
+  qwen2-1.5b-instruct.Q4_K_M.gguf \
+  --local-dir models/ \
+  --local-dir-use-symlinks False
+
+# Download TinyLlama-1.1B (Ultra Fast, ~638MB)
+huggingface-cli download TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF \
+  tinyllama-1.1b-chat.Q4_K_M.gguf \
+  --local-dir models/ \
+  --local-dir-use-symlinks False
 ```
 
-**Alternative Models** (choose one):
+**Model Comparison**:
 
-```bash
-# Llama-2-7B (good quality, ~4GB)
-huggingface-cli download TheBloke/Llama-2-7B-Chat-GGUF \
-  llama-2-7b-chat.Q4_K_M.gguf \
-  --local-dir models/ --local-dir-use-symlinks False
+| Model | Size | VRAM | Speed | Quality | Best For |
+|-------|------|------|-------|---------|----------|
+| **Mistral 7B** | 4.1GB | ~4GB | Medium | Excellent | Summary, Quiz, Flashcards (Default) |
+| **Qwen2 1.5B** | 941MB | ~1GB | Very Fast | Good | Chatbot, Flashcards, Summary |
+| **TinyLlama 1.1B** | 638MB | ~800MB | Ultra Fast | Fair | Chatbot, Testing |
 
-# Phi-3-Mini (faster, smaller, ~2GB)
-huggingface-cli download microsoft/Phi-3-mini-4k-instruct-gguf \
-  Phi-3-mini-4k-instruct-q4.gguf \
-  --local-dir models/ --local-dir-use-symlinks False
-
-# Gemma-2B (smallest, fastest, ~1.5GB)
-huggingface-cli download google/gemma-2b-it-GGUF \
-  gemma-2b-it-q4_k_m.gguf \
-  --local-dir models/ --local-dir-use-symlinks False
-```
+**Note**: You can switch between models in the Settings UI (⚙️ icon) without restarting the server.
 
 ### Update Configuration
 
-Edit `config/config.yaml` to match your downloaded model:
+The default configuration in `config/config.yaml` is already optimized for 4GB GPU:
 
 ```yaml
 llm:
   provider: "local"
   local:
-    model: "mistral-7b-instruct-v0.2.Q4_K_M"  # Match your downloaded file
+    model: "mistral-7b-instruct-v0.2.Q4_K_M"  # Default model
     model_path: "models/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
     n_ctx: 2048  # Reduced for 4GB GPU (was 4096)
     n_gpu_layers: 35  # Set to 0 for CPU-only
     max_tokens: 512  # Reduced for 4GB GPU (was 1000)
 ```
 
-**Important for 4GB GPU users:**
-- `n_ctx: 2048` - Reduced context window to prevent memory overflow
-- `max_tokens: 512` - Limited generation length for memory safety
-- These settings are already optimized in the default config
+**Important Notes:**
+- **Model Selection**: You can switch models in the Settings UI (⚙️ icon) without editing config.yaml
+- **4GB GPU Optimization**:
+  - `n_ctx: 2048` - Reduced context window to prevent memory overflow
+  - `max_tokens: 512` - Limited generation length for memory safety
+- **llama-cpp-python Version**: Requires >=0.3.16 for Qwen2 support (auto-installed by setup script)
 
 ---
 

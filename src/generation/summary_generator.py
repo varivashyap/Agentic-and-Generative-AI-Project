@@ -30,7 +30,8 @@ class SummaryGenerator:
         context: List[Tuple[Dict, float]],
         scale: str = "paragraph",
         temperature: float = None,
-        max_tokens: int = None
+        max_tokens: int = None,
+        system_prompt: str = None
     ) -> str:
         """
         Generate summary from retrieved context.
@@ -40,6 +41,7 @@ class SummaryGenerator:
             scale: Summary scale ("sentence", "paragraph", or "section")
             temperature: Override temperature (uses config default if None)
             max_tokens: Override max_tokens (uses config default if None)
+            system_prompt: Override system prompt (uses default if None)
 
         Returns:
             Generated summary
@@ -57,12 +59,12 @@ class SummaryGenerator:
 
         # Create prompt
         prompt = self._create_prompt(context_text, scale)
-        system_prompt = self._get_system_prompt()
+        sys_prompt = system_prompt if system_prompt is not None else self._get_system_prompt()
 
         # Generate
         summary = self.llm.generate(
             prompt=prompt,
-            system_prompt=system_prompt,
+            system_prompt=sys_prompt,
             temperature=temp,
             max_tokens=tokens
         )

@@ -19,8 +19,13 @@ class LLMClient:
     NO PAID APIS: OpenAI and Anthropic support removed.
     """
 
-    def __init__(self):
-        """Initialize local LLM client."""
+    def __init__(self, model_name: Optional[str] = None):
+        """
+        Initialize local LLM client.
+
+        Args:
+            model_name: Optional model name to load (overrides config.yaml)
+        """
         self.config = get_config()
         self.provider = self.config.llm.provider
 
@@ -31,14 +36,26 @@ class LLMClient:
 
         self.client = None
         self.model_path = None
-        self._initialize_client()
+        self.current_model_name = None
+        self._initialize_client(model_name)
 
-    def _initialize_client(self):
-        """Initialize the local LLM client using llama-cpp-python."""
+    def _initialize_client(self, model_name: Optional[str] = None):
+        """
+        Initialize the local LLM client using llama-cpp-python.
+
+        Args:
+            model_name: Optional model name to load (overrides config.yaml)
+        """
         logger.info("Initializing local LLM client (llama-cpp-python)")
 
-        # Get model configuration
-        self.model_name = self.config.llm.local_model
+        # Get model configuration (use provided model_name or config default)
+        if model_name:
+            self.model_name = model_name
+            logger.info(f"Using user-selected model: {model_name}")
+        else:
+            self.model_name = self.config.llm.local_model
+            logger.info(f"Using config default model: {self.model_name}")
+
         self.quantization = self.config.llm.local_quantization
 
         # Construct model path
@@ -85,6 +102,7 @@ class LLMClient:
             logger.info(f"Context window: {context_size} tokens")
 
             logger.info(f"✓ Local LLM loaded successfully: {self.model_name}")
+            self.current_model_name = self.model_name
 
         except ImportError:
             logger.error("llama-cpp-python not installed")
@@ -93,7 +111,34 @@ class LLMClient:
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             raise
-    
+
+    def reload_model(self, model_name: str):
+        """
+        Reload LLM client with a different model.
+
+        Args:
+            model_name: Name of the model to load (e.g., "phi-3-mini-4k-instruct.Q4_K_M")
+        """
+        if model_name == self.current_model_name:
+            logger.info(f"Model {model_name} already loaded, skipping reload")
+            return
+
+        logger.info(f"Reloading LLM client with model: {model_name}")
+
+        # Unload current model to free memory
+        if self.client:
+            del self.client
+            self.client = None
+            logger.info("Unloaded previous model")
+
+        # Load new model
+        self._initialize_client(model_name)
+        logger.info(f"✓ Successfully switched to model: {model_name}")
+
+    def get_current_model(self) -> str:
+        """Get the name of the currently loaded model."""
+        return self.current_model_name
+
     def generate(
         self,
         prompt: str,
@@ -203,6 +248,20 @@ class LLMClient:
             else:
                 return f"<s>[INST] {prompt} [/INST]"
 
+        # Qwen2 format (ChatML)
+        elif 'qwen2' in model_lower or 'qwen' in model_lower:
+            if system_prompt:
+                return f"<|im_start|>system\n{system_prompt}<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
+            else:
+                return f"<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
+
+        # TinyLlama format (Zephyr-style)
+        elif 'tinyllama' in model_lower or 'tiny-llama' in model_lower:
+            if system_prompt:
+                return f"<|system|>\n{system_prompt}</s>\n<|user|>\n{prompt}</s>\n<|assistant|>\n"
+            else:
+                return f"<|user|>\n{prompt}</s>\n<|assistant|>\n"
+
         # ChatML format (default for many models)
         elif 'chatml' in model_lower or 'openchat' in model_lower:
             if system_prompt:
@@ -233,6 +292,10 @@ class LLMClient:
             return ["<|eot_id|>", "<|end_of_text|>"]
         elif 'mistral' in model_lower or 'mixtral' in model_lower:
             return ["</s>", "[/INST]"]
+        elif 'qwen2' in model_lower or 'qwen' in model_lower:
+            return ["<|im_end|>", "<|endoftext|>"]
+        elif 'tinyllama' in model_lower or 'tiny-llama' in model_lower:
+            return ["</s>", "<|user|>", "<|system|>"]
         elif 'chatml' in model_lower or 'openchat' in model_lower:
             return ["<|im_end|>"]
         elif 'alpaca' in model_lower:

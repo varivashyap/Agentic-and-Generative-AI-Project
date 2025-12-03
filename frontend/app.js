@@ -656,25 +656,40 @@ function toggleSettingsModal() {
 }
 
 function populateSettingsUI(settings) {
+    // Model selection
+    const modelSelect = document.getElementById('selectedModel');
+    if (modelSelect && settings.selected_model) {
+        modelSelect.value = settings.selected_model;
+        updateModelInfo(settings.selected_model);
+    }
+
     // Summary settings
     document.getElementById('summaryTemp').value = settings.summary_temperature || 0.1;
     document.getElementById('summaryTempValue').textContent = (settings.summary_temperature || 0.1).toFixed(2);
     document.getElementById('summaryTokens').value = settings.summary_max_tokens || 600;
+    // Always show system prompt (default or custom)
+    document.getElementById('summarySystemPrompt').value = settings.summary_system_prompt || '';
 
     // Flashcard settings
     document.getElementById('flashcardTemp').value = settings.flashcard_temperature || 0.25;
     document.getElementById('flashcardTempValue').textContent = (settings.flashcard_temperature || 0.25).toFixed(2);
     document.getElementById('flashcardMax').value = settings.flashcard_max_cards || 20;
+    // Always show system prompt (default or custom)
+    document.getElementById('flashcardSystemPrompt').value = settings.flashcard_system_prompt || '';
 
     // Quiz settings
     document.getElementById('quizTemp').value = settings.quiz_temperature || 0.2;
     document.getElementById('quizTempValue').textContent = (settings.quiz_temperature || 0.2).toFixed(2);
     document.getElementById('quizNum').value = settings.quiz_num_questions || 10;
+    // Always show system prompt (default or custom)
+    document.getElementById('quizSystemPrompt').value = settings.quiz_system_prompt || '';
 
     // Chatbot settings
     document.getElementById('chatbotTemp').value = settings.chatbot_temperature || 0.7;
     document.getElementById('chatbotTempValue').textContent = (settings.chatbot_temperature || 0.7).toFixed(2);
     document.getElementById('chatbotTokens').value = settings.chatbot_max_tokens || 300;
+    // Always show system prompt (default or custom)
+    document.getElementById('chatbotSystemPrompt').value = settings.chatbot_system_prompt || '';
 
     // Retrieval settings
     document.getElementById('retrievalTopK').value = settings.retrieval_top_k || 20;
@@ -683,6 +698,7 @@ function populateSettingsUI(settings) {
 
 function saveSettingsFromUI() {
     const settings = {
+        selected_model: document.getElementById('selectedModel').value,
         summary_temperature: parseFloat(document.getElementById('summaryTemp').value),
         summary_max_tokens: parseInt(document.getElementById('summaryTokens').value),
         flashcard_temperature: parseFloat(document.getElementById('flashcardTemp').value),
@@ -695,7 +711,77 @@ function saveSettingsFromUI() {
         reranker_top_m: parseInt(document.getElementById('rerankerTopM').value)
     };
 
+    // Add system prompts if they have been modified
+    const summaryPrompt = document.getElementById('summarySystemPrompt').value.trim();
+    if (summaryPrompt) {
+        settings.summary_system_prompt = summaryPrompt;
+    }
+
+    const flashcardPrompt = document.getElementById('flashcardSystemPrompt').value.trim();
+    if (flashcardPrompt) {
+        settings.flashcard_system_prompt = flashcardPrompt;
+    }
+
+    const quizPrompt = document.getElementById('quizSystemPrompt').value.trim();
+    if (quizPrompt) {
+        settings.quiz_system_prompt = quizPrompt;
+    }
+
+    const chatbotPrompt = document.getElementById('chatbotSystemPrompt').value.trim();
+    if (chatbotPrompt) {
+        settings.chatbot_system_prompt = chatbotPrompt;
+    }
+
     saveUserSettings(settings);
+}
+
+// Model information database
+const modelDatabase = {
+    "mistral-7b-instruct-v0.2.Q4_K_M": {
+        name: "Mistral 7B",
+        size: "7B parameters",
+        vram: "~4GB",
+        speed: "Medium",
+        quality: "Excellent",
+        description: "Best overall quality with balanced speed. Recommended for most tasks including summaries, quizzes, and flashcards."
+    },
+    "qwen2-1.5b-instruct.Q4_K_M": {
+        name: "Qwen2 1.5B",
+        size: "1.5B parameters",
+        vram: "~1GB",
+        speed: "Very Fast",
+        quality: "Good",
+        description: "Alibaba's efficient model. Great for resource-constrained tasks."
+    },
+    "tinyllama-1.1b-chat.Q4_K_M": {
+        name: "TinyLlama 1.1B",
+        size: "1.1B parameters",
+        vram: "~800MB",
+        speed: "Ultra Fast",
+        quality: "Fair",
+        description: "Ultra-lightweight. Best for simple tasks and testing."
+    }
+};
+
+function updateModelInfo(modelName) {
+    const modelInfo = modelDatabase[modelName];
+    const infoDiv = document.getElementById('modelInfo');
+
+    if (modelInfo && infoDiv) {
+        infoDiv.innerHTML = `
+            <div style="margin-bottom: 10px;">
+                <strong>${modelInfo.name}</strong> (${modelInfo.size})
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                <div><strong>VRAM:</strong> ${modelInfo.vram}</div>
+                <div><strong>Speed:</strong> ${modelInfo.speed}</div>
+                <div><strong>Quality:</strong> ${modelInfo.quality}</div>
+            </div>
+            <div style="color: var(--text-secondary);">
+                ${modelInfo.description}
+            </div>
+        `;
+    }
 }
 
 // Update slider value displays
@@ -708,5 +794,16 @@ function updateSliderValue(sliderId, valueId) {
 // Load settings on app start
 window.addEventListener('DOMContentLoaded', () => {
     loadUserSettings();
+
+    // Add event listener for model selection
+    const modelSelect = document.getElementById('selectedModel');
+    if (modelSelect) {
+        modelSelect.addEventListener('change', (e) => {
+            updateModelInfo(e.target.value);
+        });
+
+        // Initialize model info display
+        updateModelInfo(modelSelect.value);
+    }
 });
 

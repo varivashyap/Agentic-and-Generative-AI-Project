@@ -20,6 +20,24 @@ def extract_user_settings(parameters: Dict[str, Any]) -> Optional[UserSettings]:
     return parameters.get('user_settings')
 
 
+def ensure_correct_model_loaded(pipeline: StudyAssistantPipeline, user_settings: Optional[UserSettings]):
+    """
+    Ensure the correct model is loaded based on user settings.
+    Reloads the model if user has selected a different one.
+
+    Args:
+        pipeline: The pipeline instance
+        user_settings: User settings (may be None)
+    """
+    if user_settings and user_settings.selected_model:
+        current_model = pipeline.get_current_model()
+        desired_model = user_settings.selected_model
+
+        if current_model != desired_model:
+            logger.info(f"User requested model change: {current_model} → {desired_model}")
+            pipeline.reload_model(desired_model)
+
+
 class BaseRequestHandler(ABC):
     """Base class for request handlers."""
     
@@ -55,16 +73,21 @@ class SummaryRequestHandler(BaseRequestHandler):
         # Extract user settings if provided
         user_settings = extract_user_settings(parameters)
 
+        # Ensure correct model is loaded
+        ensure_correct_model_loaded(pipeline, user_settings)
+
         # Use user settings or defaults
         temperature = user_settings.summary_temperature if user_settings else None
         max_tokens = user_settings.summary_max_tokens if user_settings else None
+        system_prompt = user_settings.summary_system_prompt if user_settings else None
 
         logger.info(f"Generating summary with scale={scale}, temp={temperature}, tokens={max_tokens}")
         summary = pipeline.generate_summaries(
             query=query,
             scale=scale,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            system_prompt=system_prompt
         )
 
         return {
@@ -175,8 +198,12 @@ class FlashcardsRequestHandler(BaseRequestHandler):
         # Extract user settings if provided
         user_settings = extract_user_settings(parameters)
 
+        # Ensure correct model is loaded
+        ensure_correct_model_loaded(pipeline, user_settings)
+
         # Use user settings or defaults (None = use config defaults)
         temperature = user_settings.flashcard_temperature if user_settings else None
+        system_prompt = user_settings.flashcard_system_prompt if user_settings else None
         # Override max_cards if user has custom setting
         if user_settings:
             max_cards = user_settings.flashcard_max_cards
@@ -186,7 +213,8 @@ class FlashcardsRequestHandler(BaseRequestHandler):
             query=query,
             card_type=card_type,
             max_cards=max_cards,
-            temperature=temperature
+            temperature=temperature,
+            system_prompt=system_prompt
         )
 
         return {
@@ -221,9 +249,13 @@ class QuizRequestHandler(BaseRequestHandler):
         # Extract user settings if provided
         user_settings = extract_user_settings(parameters)
 
+        # Ensure correct model is loaded
+        ensure_correct_model_loaded(pipeline, user_settings)
+
         # Use user settings or defaults (None = use config defaults)
         temperature = user_settings.quiz_temperature if user_settings else None
         max_tokens = user_settings.quiz_max_tokens if user_settings else None
+        system_prompt = user_settings.quiz_system_prompt if user_settings else None
         # Override num_questions if user has custom setting
         if user_settings:
             num_questions = user_settings.quiz_num_questions
@@ -234,7 +266,8 @@ class QuizRequestHandler(BaseRequestHandler):
             question_type=question_type,
             num_questions=num_questions,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            system_prompt=system_prompt
         )
 
         return {
@@ -279,6 +312,9 @@ class ChatbotRequestHandler(BaseRequestHandler):
         # Extract user settings if provided
         user_settings = extract_user_settings(parameters)
 
+        # Ensure correct model is loaded
+        ensure_correct_model_loaded(pipeline, user_settings)
+
         # Use user settings or defaults (None = use config defaults)
         temperature = user_settings.chatbot_temperature if user_settings else 0.7
         max_tokens = user_settings.chatbot_max_tokens if user_settings else 300
@@ -321,8 +357,10 @@ class ChatbotRequestHandler(BaseRequestHandler):
                 history_text += f"User: {turn['user']}\nAssistant: {turn['assistant']}\n"
 
         # Create prompt for chatbot
-        system_prompt = """You are a helpful study assistant. Answer questions based on the provided document context.
+        # Use custom system prompt if provided by user
+        default_system_prompt = """You are a helpful study assistant. Answer questions based on the provided document context.
 Be concise, accurate, and helpful. If the context doesn't contain relevant information, say so politely."""
+        system_prompt = user_settings.chatbot_system_prompt if user_settings else default_system_prompt
 
         user_prompt = f"""Context from document:
 {context}

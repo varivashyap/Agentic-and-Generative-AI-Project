@@ -15,40 +15,74 @@ logger = logging.getLogger(__name__)
 @dataclass
 class UserSettings:
     """User-configurable hyperparameters with defaults from config.yaml."""
-    
+
+    # Model Selection (NEW)
+    selected_model: str = "mistral-7b-instruct-v0.2.Q4_K_M"  # Model to use for all tasks
+
     # LLM Generation Settings
     temperature: float = 0.2  # Creativity (0.0 = deterministic, 1.0 = creative)
     max_tokens: int = 512  # Maximum response length
     top_p: float = 0.9  # Nucleus sampling (0.0-1.0)
-    
+
     # Summary Settings
     summary_temperature: float = 0.1  # Lower = more factual
     summary_max_tokens: int = 600
     summary_scale: str = "paragraph"  # sentence, paragraph, section
-    
+
     # Flashcard Settings
     flashcard_temperature: float = 0.25
     flashcard_max_tokens: int = 1500
     flashcard_max_cards: int = 20
-    
+
     # Quiz Settings
     quiz_temperature: float = 0.2
     quiz_max_tokens: int = 1500
     quiz_num_questions: int = 10
-    
+
     # Chatbot Settings
     chatbot_temperature: float = 0.7  # Higher for conversational
     chatbot_max_tokens: int = 300
     chatbot_max_history: int = 5
-    
+
     # Retrieval Settings
     retrieval_top_k: int = 20  # Number of chunks to retrieve
     reranker_top_m: int = 6  # Final chunks after reranking
-    
+
     # Advanced Settings (for power users)
     chunk_size_tokens: int = 300
     chunk_overlap_tokens: int = 60
-    
+
+    # Custom System Prompts (NEW - for prompt engineering)
+    summary_system_prompt: str = """You are an expert at creating accurate, factual summaries from source material.
+
+Rules:
+1. Only include information explicitly stated in the context
+2. Do not add external knowledge or assumptions
+3. Be concise and clear
+4. Maintain factual accuracy
+5. Use objective language"""
+
+    quiz_system_prompt: str = """You are an expert quiz generator. Create high-quality assessment questions.
+
+Rules:
+1. Questions should test understanding, not just memorization
+2. Provide clear, unambiguous questions
+3. Include 4 options (A, B, C, D) for multiple choice
+4. Mark the correct answer
+5. Provide brief explanations"""
+
+    flashcard_system_prompt: str = """You are an expert at creating effective study flashcards.
+
+Rules:
+1. Keep cards focused on one concept
+2. Use clear, concise language
+3. Front should be a question or term
+4. Back should be the answer or definition
+5. Make cards memorable and easy to review"""
+
+    chatbot_system_prompt: str = """You are a helpful study assistant. Answer questions based on the provided document context.
+Be concise, accurate, and helpful. If the context doesn't contain relevant information, say so politely."""
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
@@ -213,12 +247,60 @@ class SettingsManager:
         """Check if user has customized settings."""
         return user_id in self.user_settings
 
+    def get_available_models(self) -> list[Dict[str, Any]]:
+        """
+        Get list of available models for 4GB GPU.
+
+        Returns:
+            List of model dicts with name, description, size, speed, quality
+        """
+        return [
+            {
+                "name": "mistral-7b-instruct-v0.2.Q4_K_M",
+                "display_name": "Mistral 7B (Default)",
+                "size": "7B",
+                "vram": "~4GB",
+                "speed": "Medium",
+                "quality": "Excellent",
+                "description": "Best overall quality, balanced speed. Recommended for most tasks.",
+                "recommended_for": ["summary", "quiz", "flashcards"]
+            },
+            {
+                "name": "qwen2-1.5b-instruct.Q4_K_M",
+                "display_name": "Qwen2 1.5B",
+                "size": "1.5B",
+                "vram": "~1GB",
+                "speed": "Very Fast",
+                "quality": "Good",
+                "description": "Alibaba's efficient model. Great for resource-constrained tasks.",
+                "recommended_for": ["chatbot", "flashcards", "summary"]
+            },
+            {
+                "name": "tinyllama-1.1b-chat.Q4_K_M",
+                "display_name": "TinyLlama 1.1B",
+                "size": "1.1B",
+                "vram": "~800MB",
+                "speed": "Ultra Fast",
+                "quality": "Fair",
+                "description": "Ultra-lightweight. Best for simple tasks and testing.",
+                "recommended_for": ["chatbot"]
+            }
+        ]
+
     def get_settings_schema(self) -> Dict[str, Any]:
         """
         Get schema describing all available settings.
         Used by frontend to build settings UI.
         """
         return {
+            "model": {
+                "selected_model": {
+                    "type": "select",
+                    "options": self.get_available_models(),
+                    "default": self.default_settings.selected_model,
+                    "description": "LLM model to use for all generation tasks"
+                }
+            },
             "llm": {
                 "temperature": {
                     "type": "float",

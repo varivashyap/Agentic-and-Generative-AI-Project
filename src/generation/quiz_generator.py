@@ -38,7 +38,8 @@ class QuizGenerator:
         num_questions: int = 10,
         difficulty: Optional[str] = None,
         temperature: float = None,
-        max_tokens: int = None
+        max_tokens: int = None,
+        system_prompt: str = None
     ) -> List[Dict[str, any]]:
         """
         Generate quiz questions from context.
@@ -50,6 +51,7 @@ class QuizGenerator:
             difficulty: Difficulty level ("easy", "medium", "hard") or None for mixed
             temperature: Optional temperature override (None = use config default)
             max_tokens: Optional max_tokens override (None = use config default)
+            system_prompt: Override system prompt (uses default if None)
 
         Returns:
             List of question dicts
@@ -62,7 +64,7 @@ class QuizGenerator:
 
         # Create prompt
         prompt = self._create_prompt(context_text, question_type, num_questions, difficulty)
-        system_prompt = self._get_system_prompt()
+        sys_prompt = system_prompt if system_prompt is not None else self._get_system_prompt()
 
         # Calculate safe max_tokens for 4GB GPU
         # Each MCQ needs ~150 tokens (question + 4 options + answer)
@@ -81,7 +83,7 @@ class QuizGenerator:
         # Generate
         response = self.llm.generate(
             prompt=prompt,
-            system_prompt=system_prompt,
+            system_prompt=sys_prompt,
             temperature=temp,
             max_tokens=tokens
         )

@@ -64,6 +64,24 @@ echo "Installing MCP server requirements..."
 pip install flask flask-cors werkzeug
 echo "✓ MCP server requirements installed"
 
+# Ensure llama-cpp-python is up to date (required for Qwen2 support)
+echo ""
+echo "Checking llama-cpp-python version..."
+CURRENT_VERSION=$(pip show llama-cpp-python 2>/dev/null | grep Version | awk '{print $2}')
+REQUIRED_VERSION="0.3.0"
+
+if [ -z "$CURRENT_VERSION" ]; then
+    echo "Installing llama-cpp-python..."
+    pip install llama-cpp-python>=0.3.16
+    echo "✓ llama-cpp-python installed"
+elif python3 -c "from packaging import version; import sys; sys.exit(0 if version.parse('$CURRENT_VERSION') >= version.parse('$REQUIRED_VERSION') else 1)" 2>/dev/null; then
+    echo "✓ llama-cpp-python version: $CURRENT_VERSION (OK)"
+else
+    echo "Upgrading llama-cpp-python from $CURRENT_VERSION to >=0.3.16..."
+    pip install --upgrade llama-cpp-python
+    echo "✓ llama-cpp-python upgraded"
+fi
+
 # Create necessary directories
 echo ""
 echo "Creating directories..."
@@ -75,17 +93,50 @@ mkdir -p results/testing
 mkdir -p logs
 echo "✓ Directories created"
 
-# Check if model exists
+# Check if models exist
 echo ""
-echo "Checking for LLM model..."
-MODEL_PATH="models/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
-if [ -f "$MODEL_PATH" ]; then
-    echo "✓ Model found: $MODEL_PATH"
+echo "Checking for LLM models..."
+MODELS_FOUND=0
+
+# Check Mistral 7B (default)
+if [ -f "models/mistral-7b-instruct-v0.2.Q4_K_M.gguf" ]; then
+    echo "✓ Mistral 7B found (default, best quality)"
+    MODELS_FOUND=$((MODELS_FOUND + 1))
+fi
+
+# Check Qwen2 1.5B
+if [ -f "models/qwen2-1.5b-instruct.Q4_K_M.gguf" ]; then
+    echo "✓ Qwen2 1.5B found (fast & efficient)"
+    MODELS_FOUND=$((MODELS_FOUND + 1))
+fi
+
+# Check TinyLlama 1.1B
+if [ -f "models/tinyllama-1.1b-chat.Q4_K_M.gguf" ]; then
+    echo "✓ TinyLlama 1.1B found (ultra fast)"
+    MODELS_FOUND=$((MODELS_FOUND + 1))
+fi
+
+if [ $MODELS_FOUND -eq 0 ]; then
+    echo "⚠ Warning: No models found in models/ directory"
+    echo ""
+    echo "Please download at least one model:"
+    echo ""
+    echo "Mistral 7B (Recommended - Best Quality):"
+    echo "  huggingface-cli download TheBloke/Mistral-7B-Instruct-v0.2-GGUF \\"
+    echo "    mistral-7b-instruct-v0.2.Q4_K_M.gguf \\"
+    echo "    --local-dir models/ --local-dir-use-symlinks False"
+    echo ""
+    echo "Qwen2 1.5B (Fast & Efficient):"
+    echo "  huggingface-cli download Qwen/Qwen2-1.5B-Instruct-GGUF \\"
+    echo "    qwen2-1.5b-instruct.Q4_K_M.gguf \\"
+    echo "    --local-dir models/ --local-dir-use-symlinks False"
+    echo ""
+    echo "TinyLlama 1.1B (Ultra Fast):"
+    echo "  huggingface-cli download TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF \\"
+    echo "    tinyllama-1.1b-chat.Q4_K_M.gguf \\"
+    echo "    --local-dir models/ --local-dir-use-symlinks False"
 else
-    echo "⚠ Warning: Model not found at $MODEL_PATH"
-    echo "   Please download the model using:"
-    echo "   make download-model"
-    echo "   or manually download from Hugging Face"
+    echo "✓ Found $MODELS_FOUND model(s)"
 fi
 
 # Create systemd service file (optional)

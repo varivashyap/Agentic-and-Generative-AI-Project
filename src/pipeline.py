@@ -54,14 +54,29 @@ class StudyAssistantPipeline:
         self.summary_generator = SummaryGenerator(self.llm_client)
         self.flashcard_generator = FlashcardGenerator(self.llm_client)
         self.quiz_generator = QuizGenerator(self.llm_client)
-        
+
         self.validator = ContentValidator(self.embedding_model)
         self.metrics = EvaluationMetrics()
-        
+
         self.anki_exporter = AnkiExporter()
         self.csv_exporter = CSVExporter()
-        
+
         logger.info("Pipeline initialized successfully")
+
+    def reload_model(self, model_name: str):
+        """
+        Reload the LLM with a different model.
+
+        Args:
+            model_name: Name of the model to load (e.g., "phi-3-mini-4k-instruct.Q4_K_M")
+        """
+        logger.info(f"Reloading pipeline with model: {model_name}")
+        self.llm_client.reload_model(model_name)
+        logger.info(f"✓ Pipeline now using model: {model_name}")
+
+    def get_current_model(self) -> str:
+        """Get the name of the currently loaded model."""
+        return self.llm_client.get_current_model()
     
     def ingest_pdf(self, pdf_path: str):
         """
@@ -128,7 +143,8 @@ class StudyAssistantPipeline:
         query: Optional[str] = None,
         scale: str = "paragraph",
         temperature: float = None,
-        max_tokens: int = None
+        max_tokens: int = None,
+        system_prompt: str = None
     ) -> str:
         """
         Generate summary from ingested content.
@@ -138,6 +154,7 @@ class StudyAssistantPipeline:
             scale: Summary scale ("sentence", "paragraph", "section")
             temperature: Override temperature (uses config default if None)
             max_tokens: Override max_tokens (uses config default if None)
+            system_prompt: Override system prompt (uses default if None)
 
         Returns:
             Generated summary
@@ -155,7 +172,8 @@ class StudyAssistantPipeline:
             context,
             scale,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            system_prompt=system_prompt
         )
 
         # Validate
@@ -173,7 +191,8 @@ class StudyAssistantPipeline:
         query: Optional[str] = None,
         card_type: str = "definition",
         max_cards: int = 50,
-        temperature: float = None
+        temperature: float = None,
+        system_prompt: str = None
     ) -> List[Dict[str, str]]:
         """
         Generate flashcards from ingested content.
@@ -183,6 +202,7 @@ class StudyAssistantPipeline:
             card_type: Type of flashcard
             max_cards: Maximum number of cards
             temperature: Optional temperature override (None = use config default)
+            system_prompt: Override system prompt (uses default if None)
 
         Returns:
             List of flashcard dicts
@@ -200,7 +220,8 @@ class StudyAssistantPipeline:
             context,
             card_type,
             max_cards,
-            temperature=temperature
+            temperature=temperature,
+            system_prompt=system_prompt
         )
 
         logger.info(f"Generated {len(flashcards)} flashcards")
@@ -212,7 +233,8 @@ class StudyAssistantPipeline:
         question_type: str = "mcq",
         num_questions: int = 10,
         temperature: float = None,
-        max_tokens: int = None
+        max_tokens: int = None,
+        system_prompt: str = None
     ) -> List[Dict[str, any]]:
         """
         Generate quiz questions from ingested content.
@@ -223,6 +245,7 @@ class StudyAssistantPipeline:
             num_questions: Number of questions
             temperature: Optional temperature override (None = use config default)
             max_tokens: Optional max_tokens override (None = use config default)
+            system_prompt: Override system prompt (uses default if None)
 
         Returns:
             List of question dicts
@@ -241,7 +264,8 @@ class StudyAssistantPipeline:
             question_type,
             num_questions,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            system_prompt=system_prompt
         )
 
         logger.info(f"Generated {len(questions)} questions")

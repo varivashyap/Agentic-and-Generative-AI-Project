@@ -93,6 +93,20 @@ def list_request_types():
     })
 
 
+@app.route('/models/available', methods=['GET'])
+def get_available_models():
+    """Get list of available LLM models for user selection."""
+    try:
+        models = settings_manager.get_available_models()
+        return jsonify({
+            'success': True,
+            'models': models
+        })
+    except Exception as e:
+        logger.error(f"Error getting available models: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/settings/schema', methods=['GET'])
 def get_settings_schema():
     """Get schema for all available settings (for building UI)."""
