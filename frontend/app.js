@@ -1,3 +1,69 @@
+// Study Plan Feature
+async function showStudyPlan() {
+    if (!uploadedFileId) {
+        showStatus('error', '⚠️ Please upload a file first!');
+        return;
+    }
+    showSpinner(true);
+    showStatus('info', '⏳ Generating study plan...');
+    resultsSection.classList.remove('show');
+
+    // Optionally, fetch calendar events and exam schedule from backend or prompt user
+    // For demo, just use calendar events from /calendar/events and empty exam schedule
+    let calendarEvents = [];
+    try {
+        const calRes = await fetch(`${API_URL}/calendar/events`, { credentials: 'include' });
+        if (calRes.ok) {
+            calendarEvents = await calRes.json();
+        }
+    } catch (e) {
+        // Ignore calendar error, fallback to empty
+    }
+    const examSchedule = [];
+
+    try {
+        const response = await fetch(`${API_URL}/process`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                file_id: uploadedFileId,
+                request_type: 'study_plan',
+                model_name: 'default',
+                parameters: {
+                    calendar_events: calendarEvents,
+                    exam_schedule: examSchedule,
+                    study_goals: 'Prepare for upcoming exams',
+                    top_k: 5
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to generate study plan');
+        }
+
+        const data = await response.json();
+        displayStudyPlan(data.result || data);
+        showStatus('success', '✅ Study plan generated!');
+    } catch (error) {
+        console.error('Study plan error:', error);
+        showStatus('error', '❌ Failed to generate study plan. Please try again.');
+    } finally {
+        showSpinner(false);
+    }
+}
+
+function displayStudyPlan(result) {
+    resultsSection.classList.add('show');
+    resultTitle.innerHTML = '📅 Study Plan';
+    const planText = result.study_plan || 'No study plan generated.';
+    resultContent.innerHTML = `
+        <div style="background: var(--bg-primary); padding: 24px; border-radius: 12px; line-height: 1.8; font-size: 1.08em;">
+            ${planText.replace(/\n/g, '<br>')}
+        </div>
+    `;
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
 // Study Assistant Frontend - Modern Dark Theme
 const API_URL = 'http://localhost:5000';
 

@@ -86,6 +86,83 @@ class SummaryRequestHandler(BaseRequestHandler):
         }
 
 
+class StudyPlanRequestHandler(BaseRequestHandler):
+    """Handler for study plan generation requests using the local Mistral model via LLMClient."""
+    def __init__(self):
+        super().__init__()
+
+    def handle(self, pipeline: StudyAssistantPipeline, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generate a study plan based on calendar, exams, and document context.
+        """
+        calendar_events = parameters.get('calendar_events', [])
+        exam_schedule = parameters.get('exam_schedule', [])
+        study_goals = parameters.get('study_goals', 'Prepare for upcoming exams')
+        top_k = parameters.get('top_k', 5)
+
+        # Retrieve document context
+        context_results = pipeline._retrieve_context(study_goals, top_k=top_k)
+        context_texts = []
+        for doc, score in context_results:
+            text = doc.get('text', '')
+            if len(text) > 500:
+                text = text[:500] + "..."
+            context_texts.append(text)
+        context = '\n\n'.join(context_texts) if context_texts else "No relevant context found."
+
+        # Format calendar and exam info
+        calendar_str = '\n'.join([
+            f"{e.get('summary', 'Event')}: {e.get('start', '')} - {e.get('end', '')}" for e in calendar_events
+        ])
+        exam_str = '\n'.join([
+            f"{ex.get('subject', 'Exam')}: {ex.get('date', '')}" for ex in exam_schedule
+        ])
+
+        prompt = f"""
+You are an expert study assistant. Based on the user's calendar (free time, events), exam schedule, and the following study material context, create a detailed study plan. The plan should:
+- Allocate time for each subject based on exam dates and available free time
+- Suggest daily/weekly goals
+- Be realistic and personalized
+
+Calendar Events:\n{calendar_str}
+Exam Schedule:\n{exam_str}
+Document Context:\n{context}
+
+Return the study plan in a clear, actionable format. Ensure to include dates of imporant exams and activities (Eg: travel), and plan around them.
+"""
+
+        # Use the same LLMClient as the rest of the pipeline (Mistral model)
+        try:
+            plan = pipeline.llm_client.generate(
+                prompt=prompt,
+                system_prompt="You are a helpful study assistant.",
+                temperature=0.7,
+                max_tokens=512
+            )
+        except Exception as e:
+            plan = f"Error generating study plan: {e}"
+
+        return {
+            'study_plan': plan,
+            'calendar_events': calendar_events,
+            'exam_schedule': exam_schedule
+        }
+
+    def get_name(self) -> str:
+        return 'study_plan'
+
+    def get_description(self) -> str:
+        return 'Generate a personalized study plan using calendar, exams, and document context.'
+
+    def get_default_parameters(self) -> Dict[str, Any]:
+        return {
+            'calendar_events': [],
+            'exam_schedule': [],
+            'study_goals': 'Prepare for upcoming exams',
+            'top_k': 5
+        }
+
+
 class FlashcardsRequestHandler(BaseRequestHandler):
     """Handler for flashcard generation requests."""
 
@@ -117,13 +194,13 @@ class FlashcardsRequestHandler(BaseRequestHandler):
             'count': len(flashcards),
             'card_type': card_type
         }
-    
+
     def get_name(self) -> str:
         return 'flashcards'
-    
+
     def get_description(self) -> str:
         return 'Generate flashcards for studying'
-    
+
     def get_default_parameters(self) -> Dict[str, Any]:
         return {
             'query': None,
@@ -336,6 +413,7 @@ class RequestHandler:
         self.register_handler(FlashcardsRequestHandler())
         self.register_handler(QuizRequestHandler())
         self.register_handler(ChatbotRequestHandler())
+        self.register_handler(StudyPlanRequestHandler())
 
     def register_handler(self, handler: BaseRequestHandler):
         """Register a new request handler."""
