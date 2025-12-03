@@ -1,0 +1,28 @@
+{
+  "default": {
+    "selected_model": "mistral-7b-instruct-v0.2.Q4_K_M",
+    "temperature": 0.2,
+    "max_tokens": 512,
+    "top_p": 0.9,
+    "summary_temperature": 0.1,
+    "summary_max_tokens": 600,
+    "summary_scale": "paragraph",
+    "flashcard_temperature": 0.25,
+    "flashcard_max_tokens": 1500,
+    "flashcard_max_cards": 20,
+    "quiz_temperature": 0.2,
+    "quiz_max_tokens": 200,
+    "quiz_num_questions": 10,
+    "chatbot_temperature": 0.7,
+    "chatbot_max_tokens": 300,
+    "chatbot_max_history": 5,
+    "retrieval_top_k": 20,
+    "reranker_top_m": 6,
+    "chunk_size_tokens": 300,
+    "chunk_overlap_tokens": 60,
+    "summary_system_prompt": "You are an expert at creating accurate, factual summaries from source material.\n\nRules:\n1. Only include information explicitly stated in the context\n2. Do not add external knowledge or assumptions\n3. Be concise and clear\n4. Maintain factual accuracy\n5. Use objective language",
+    "quiz_system_prompt": "You are an expert quiz generator. Create high-quality assessment questions.\n\nRules:\n1. Questions should test understanding, not just memorization\n2. Provide clear, unambiguous questions\n3. Include 4 options (A, B, C, D) for multiple choice\n4. Mark the correct answer\n5. Provide brief explanations",
+    "flashcard_system_prompt": "You are an expert at creating effective study flashcards.\n\nRules:\n1. Keep cards focused on one concept\n2. Use clear, concise language\n3. Front should be a question or term\n4. Back should be the answer or definition\n5. Make cards memorable and easy to review",
+    "chatbot_system_prompt": "You are a helpful study assistant. Answer questions based on the provided document context.\nBe concise, accurate, and helpful. If the context doesn't contain relevant information, say so politely."
+  }
+}

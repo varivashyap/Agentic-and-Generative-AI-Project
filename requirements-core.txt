@@ -1,0 +1,44 @@
+# Minimal Core Dependencies - Install these first
+# Basic requirements that are generally stable
+
+# Core dependencies
+python-dotenv==1.0.0
+pyyaml==6.0.1
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Basic utilities
+numpy==1.24.3
+pandas==2.1.4
+tqdm==4.66.1
+requests==2.31.0
+
+# Flask for MCP server
+flask==3.0.0
+flask-cors==4.0.0
+werkzeug==3.0.1
+
+# Basic PDF processing
+pdfplumber==0.10.3
+PyMuPDF==1.23.8
+Pillow==10.1.0
+
+# Export
+genanki==0.13.1
+
+# Text processing
+yake==0.4.8
+
+# Vector store (CPU only for now)
+faiss-cpu==1.7.4
+
+# BM25 for retrieval
+rank-bm25==0.2.2
+
+# Evaluation
+rouge-score==0.1.2
+
+# Development
+pytest==7.4.3
+black==23.12.1
+flake8==7.0.0

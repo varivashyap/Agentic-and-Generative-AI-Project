@@ -1,0 +1,523 @@
+"""
+Request handlers for MCP server.
+Modular design allows easy addition of new request types.
+"""
+
+import logging
+from pathlib import Path
+from typing import Dict, List, Any, Optional
+from abc import ABC, abstractmethod
+
+from src.pipeline import StudyAssistantPipeline
+from mcp_server.session_manager import SessionManager, DocumentSession
+from mcp_server.settings_manager import UserSettings
+
+logger = logging.getLogger(__name__)
+
+
+def extract_user_settings(parameters: Dict[str, Any]) -> Optional[UserSettings]:
+    """Extract user settings from parameters if present."""
+    return parameters.get('user_settings')
+
+
+def ensure_correct_model_loaded(pipeline: StudyAssistantPipeline, user_settings: Optional[UserSettings]):
+    """
+    Ensure the correct model is loaded based on user settings.
+    Reloads the model if user has selected a different one.
+
+    Args:
+        pipeline: The pipeline instance
+        user_settings: User settings (may be None)
+    """
+    if user_settings and user_settings.selected_model:
+        current_model = pipeline.get_current_model()
+        desired_model = user_settings.selected_model
+
+        if current_model != desired_model:
+            logger.info(f"User requested model change: {current_model} → {desired_model}")
+            pipeline.reload_model(desired_model)
+
+
+class BaseRequestHandler(ABC):
+    """Base class for request handlers."""
+    
+    @abstractmethod
+    def handle(self, pipeline: StudyAssistantPipeline, parameters: Dict[str, Any]) -> Any:
+        """Handle the request and return results."""
+        pass
+    
+    @abstractmethod
+    def get_name(self) -> str:
+        """Get the name of this request type."""
+        pass
+    
+    @abstractmethod
+    def get_description(self) -> str:
+        """Get description of this request type."""
+        pass
+    
+    @abstractmethod
+    def get_default_parameters(self) -> Dict[str, Any]:
+        """Get default parameters for this request type."""
+        pass
+
+
+class SummaryRequestHandler(BaseRequestHandler):
+    """Handler for summary generation requests."""
+
+    def handle(self, pipeline: StudyAssistantPipeline, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate summary from ingested content."""
+        query = parameters.get('query')
+        scale = parameters.get('scale', 'paragraph')
+
+        # Extract user settings if provided
+        user_settings = extract_user_settings(parameters)
+
+        # Ensure correct model is loaded
+        ensure_correct_model_loaded(pipeline, user_settings)
+
+        # Use user settings or defaults
+        temperature = user_settings.summary_temperature if user_settings else None
+        max_tokens = user_settings.summary_max_tokens if user_settings else None
+        system_prompt = user_settings.summary_system_prompt if user_settings else None
+
+        logger.info(f"Generating summary with scale={scale}, temp={temperature}, tokens={max_tokens}")
+        summary = pipeline.generate_summaries(
+            query=query,
+            scale=scale,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            system_prompt=system_prompt
+        )
+
+        return {
+            'summary': summary,
+            'scale': scale,
+            'length': len(summary)
+        }
+    
+    def get_name(self) -> str:
+        return 'summary'
+    
+    def get_description(self) -> str:
+        return 'Generate a summary of the document content'
+    
+    def get_default_parameters(self) -> Dict[str, Any]:
+        return {
+            'query': None,
+            'scale': 'paragraph'  # Options: sentence, paragraph, section
+        }
+
+
+class StudyPlanRequestHandler(BaseRequestHandler):
+    """Handler for study plan generation requests using the local Mistral model via LLMClient."""
+    def __init__(self):
+        super().__init__()
+
+    def handle(self, pipeline: StudyAssistantPipeline, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generate a study plan based on calendar, exams, and document context.
+        """
+        calendar_events = parameters.get('calendar_events', [])
+        exam_schedule = parameters.get('exam_schedule', [])
+        study_goals = parameters.get('study_goals', 'Prepare for upcoming exams')
+        top_k = parameters.get('top_k', 5)
+
+        # Retrieve document context
+        context_results = pipeline._retrieve_context(study_goals, top_k=top_k)
+        context_texts = []
+        for doc, score in context_results:
+            text = doc.get('text', '')
+            if len(text) > 500:
+                text = text[:500] + "..."
+            context_texts.append(text)
+        context = '\n\n'.join(context_texts) if context_texts else "No relevant context found."
+
+        # Format calendar and exam info
+        calendar_str = '\n'.join([
+            f"{e.get('summary', 'Event')}: {e.get('start', '')} - {e.get('end', '')}" for e in calendar_events
+        ])
+        exam_str = '\n'.join([
+            f"{ex.get('subject', 'Exam')}: {ex.get('date', '')}" for ex in exam_schedule
+        ])
+
+        prompt = f"""
+You are an expert study assistant. Based on the user's calendar (free time, events), exam schedule, and the following study material context, create a detailed study plan. The plan should:
+- Allocate time for each subject based on exam dates and available free time
+- Suggest daily/weekly goals
+- Be realistic and personalized
+
+Calendar Events:\n{calendar_str}
+Exam Schedule:\n{exam_str}
+Document Context:\n{context}
+
+Return the study plan in a clear, actionable format. Ensure to include dates of imporant exams and activities (Eg: travel), and plan around them.
+"""
+
+        # Use the same LLMClient as the rest of the pipeline (Mistral model)
+        try:
+            plan = pipeline.llm_client.generate(
+                prompt=prompt,
+                system_prompt="You are a helpful study assistant.",
+                temperature=0.7,
+                max_tokens=512
+            )
+        except Exception as e:
+            plan = f"Error generating study plan: {e}"
+
+        return {
+            'study_plan': plan,
+            'calendar_events': calendar_events,
+            'exam_schedule': exam_schedule
+        }
+
+    def get_name(self) -> str:
+        return 'study_plan'
+
+    def get_description(self) -> str:
+        return 'Generate a personalized study plan using calendar, exams, and document context.'
+
+    def get_default_parameters(self) -> Dict[str, Any]:
+        return {
+            'calendar_events': [],
+            'exam_schedule': [],
+            'study_goals': 'Prepare for upcoming exams',
+            'top_k': 5
+        }
+
+
+class FlashcardsRequestHandler(BaseRequestHandler):
+    """Handler for flashcard generation requests."""
+
+    def handle(self, pipeline: StudyAssistantPipeline, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate flashcards from ingested content."""
+        query = parameters.get('query')
+        card_type = parameters.get('card_type', 'definition')
+        max_cards = parameters.get('max_cards', 20)
+
+        # Extract user settings if provided
+        user_settings = extract_user_settings(parameters)
+
+        # Ensure correct model is loaded
+        ensure_correct_model_loaded(pipeline, user_settings)
+
+        # Use user settings or defaults (None = use config defaults)
+        temperature = user_settings.flashcard_temperature if user_settings else None
+        system_prompt = user_settings.flashcard_system_prompt if user_settings else None
+        # Override max_cards if user has custom setting
+        if user_settings:
+            max_cards = user_settings.flashcard_max_cards
+
+        logger.info(f"Generating {max_cards} flashcards of type={card_type}")
+        flashcards = pipeline.generate_flashcards(
+            query=query,
+            card_type=card_type,
+            max_cards=max_cards,
+            temperature=temperature,
+            system_prompt=system_prompt
+        )
+
+        return {
+            'flashcards': flashcards,
+            'count': len(flashcards),
+            'card_type': card_type
+        }
+
+    def get_name(self) -> str:
+        return 'flashcards'
+
+    def get_description(self) -> str:
+        return 'Generate flashcards for studying'
+
+    def get_default_parameters(self) -> Dict[str, Any]:
+        return {
+            'query': None,
+            'card_type': 'definition',  # Options: definition, concept, cloze
+            'max_cards': 20
+        }
+
+
+class QuizRequestHandler(BaseRequestHandler):
+    """Handler for quiz generation requests."""
+
+    def handle(self, pipeline: StudyAssistantPipeline, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate quiz questions from ingested content."""
+        query = parameters.get('query')
+        question_type = parameters.get('question_type', 'mcq')
+        num_questions = parameters.get('num_questions', 10)
+
+        # Extract user settings if provided
+        user_settings = extract_user_settings(parameters)
+
+        # Ensure correct model is loaded
+        ensure_correct_model_loaded(pipeline, user_settings)
+
+        # Use user settings or defaults (None = use config defaults)
+        temperature = user_settings.quiz_temperature if user_settings else None
+        max_tokens = user_settings.quiz_max_tokens if user_settings else None
+        system_prompt = user_settings.quiz_system_prompt if user_settings else None
+        # Override num_questions if user has custom setting
+        if user_settings:
+            num_questions = user_settings.quiz_num_questions
+
+        logger.info(f"Generating {num_questions} questions of type={question_type}")
+        questions = pipeline.generate_quizzes(
+            query=query,
+            question_type=question_type,
+            num_questions=num_questions,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            system_prompt=system_prompt
+        )
+
+        return {
+            'questions': questions,
+            'count': len(questions),
+            'question_type': question_type
+        }
+
+    def get_name(self) -> str:
+        return 'quiz'
+
+    def get_description(self) -> str:
+        return 'Generate quiz questions for assessment'
+
+    def get_default_parameters(self) -> Dict[str, Any]:
+        return {
+            'query': None,
+            'question_type': 'mcq',  # Options: mcq, short_answer, numerical
+            'num_questions': 10
+        }
+
+
+class ChatbotRequestHandler(BaseRequestHandler):
+    """Handler for chatbot conversation requests with RAG."""
+
+    def __init__(self):
+        """Initialize chatbot handler with conversation history."""
+        super().__init__()
+        # Store conversation history per session
+        self.conversation_history: Dict[str, List[Dict[str, str]]] = {}
+
+    def handle(self, pipeline: StudyAssistantPipeline, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle chatbot conversation with RAG.
+
+        Retrieves relevant context from the document and generates a response.
+        """
+        message = parameters.get('message', '')
+        session_id = parameters.get('session_id', 'default')
+        max_history = parameters.get('max_history', 5)
+
+        # Extract user settings if provided
+        user_settings = extract_user_settings(parameters)
+
+        # Ensure correct model is loaded
+        ensure_correct_model_loaded(pipeline, user_settings)
+
+        # Use user settings or defaults (None = use config defaults)
+        temperature = user_settings.chatbot_temperature if user_settings else 0.7
+        max_tokens = user_settings.chatbot_max_tokens if user_settings else 300
+
+        if not message:
+            return {
+                'response': 'Please provide a message.',
+                'error': 'No message provided'
+            }
+
+        logger.info(f"Chatbot query: {message[:100]}...")
+
+        # Initialize conversation history for this session if needed
+        if session_id not in self.conversation_history:
+            self.conversation_history[session_id] = []
+
+        # Retrieve relevant context from document using RAG
+        # Reduced to top_k=2 to prevent memory issues on 4GB GPU
+        context_results = pipeline._retrieve_context(message, top_k=2)
+
+        # Format context - limit length to prevent context overflow
+        context_texts = []
+        for doc, score in context_results:
+            text = doc.get('text', '')
+            # Truncate very long chunks to 500 chars max
+            if len(text) > 500:
+                text = text[:500] + "..."
+            context_texts.append(text)
+
+        context = '\n\n'.join(context_texts) if context_texts else "No relevant context found."
+
+        # Get recent conversation history
+        history = self.conversation_history[session_id][-max_history:]
+
+        # Build conversation context
+        history_text = ""
+        if history:
+            history_text = "\n\nPrevious conversation:\n"
+            for turn in history:
+                history_text += f"User: {turn['user']}\nAssistant: {turn['assistant']}\n"
+
+        # Create prompt for chatbot
+        # Use custom system prompt if provided by user
+        default_system_prompt = """You are a helpful study assistant. Answer questions based on the provided document context.
+Be concise, accurate, and helpful. If the context doesn't contain relevant information, say so politely."""
+        system_prompt = user_settings.chatbot_system_prompt if user_settings else default_system_prompt
+
+        user_prompt = f"""Context from document:
+{context}
+{history_text}
+
+User question: {message}
+
+Please provide a helpful answer based on the context above."""
+
+        # Generate response using LLM
+        # Use user settings or defaults
+        try:
+            response = pipeline.llm_client.generate(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+
+            # Store in conversation history
+            self.conversation_history[session_id].append({
+                'user': message,
+                'assistant': response
+            })
+
+            # Keep only recent history (prevent memory overflow)
+            if len(self.conversation_history[session_id]) > 20:
+                self.conversation_history[session_id] = self.conversation_history[session_id][-20:]
+
+            return {
+                'response': response,
+                'context_used': len(context_texts),
+                'session_id': session_id
+            }
+
+        except Exception as e:
+            logger.error(f"Chatbot generation failed: {e}", exc_info=True)
+            return {
+                'response': 'Sorry, I encountered an error generating a response.',
+                'error': str(e)
+            }
+
+    def get_name(self) -> str:
+        return 'chatbot'
+
+    def get_description(self) -> str:
+        return 'Interactive chatbot with RAG for document Q&A'
+
+    def get_default_parameters(self) -> Dict[str, Any]:
+        return {
+            'message': '',
+            'session_id': 'default',
+            'max_history': 5
+        }
+
+    def clear_history(self, session_id: str = None):
+        """Clear conversation history for a session or all sessions."""
+        if session_id:
+            if session_id in self.conversation_history:
+                self.conversation_history[session_id] = []
+                logger.info(f"Cleared conversation history for session: {session_id}")
+        else:
+            self.conversation_history = {}
+            logger.info("Cleared all conversation history")
+
+
+class RequestHandler:
+    """Main request handler that manages all request types."""
+
+    def __init__(self, model_registry, session_manager: Optional[SessionManager] = None):
+        """
+        Initialize request handler with model registry and session manager.
+
+        Args:
+            model_registry: Registry of available models
+            session_manager: Session manager for caching (optional, will create if None)
+        """
+        self.model_registry = model_registry
+        self.session_manager = session_manager or SessionManager()
+        self.handlers: Dict[str, BaseRequestHandler] = {}
+
+        # Register default handlers
+        self._register_default_handlers()
+    
+    def _register_default_handlers(self):
+        """Register the default request handlers."""
+        self.register_handler(SummaryRequestHandler())
+        self.register_handler(FlashcardsRequestHandler())
+        self.register_handler(QuizRequestHandler())
+        self.register_handler(ChatbotRequestHandler())
+        self.register_handler(StudyPlanRequestHandler())
+
+    def register_handler(self, handler: BaseRequestHandler):
+        """Register a new request handler."""
+        name = handler.get_name()
+        self.handlers[name] = handler
+        logger.info(f"Registered handler: {name}")
+
+    def list_request_types(self) -> List[Dict[str, Any]]:
+        """List all available request types."""
+        return [
+            {
+                'name': handler.get_name(),
+                'description': handler.get_description(),
+                'default_parameters': handler.get_default_parameters()
+            }
+            for handler in self.handlers.values()
+        ]
+
+    def handle_request(
+        self,
+        file_id: str,
+        filepath: str,
+        request_type: str,
+        model_name: str = 'default',
+        parameters: Optional[Dict[str, Any]] = None
+    ) -> Any:
+        """
+        Handle a request by processing the file and generating content.
+        Uses session manager to cache processed documents and avoid redundant ASR/OCR.
+
+        Args:
+            file_id: Unique file identifier
+            filepath: Path to the uploaded file
+            request_type: Type of request (summary, flashcards, quiz)
+            model_name: Name of the model to use
+            parameters: Request-specific parameters
+
+        Returns:
+            Generated content
+        """
+        if request_type not in self.handlers:
+            raise ValueError(f"Unknown request type: {request_type}. Available: {list(self.handlers.keys())}")
+
+        # Get handler
+        handler = self.handlers[request_type]
+
+        # Merge with default parameters
+        params = handler.get_default_parameters().copy()
+        if parameters:
+            params.update(parameters)
+
+        # Get or create session (this handles caching)
+        session = self.session_manager.get_or_create_session(file_id, filepath)
+
+        # Process document if not already processed (ASR/OCR/embeddings)
+        # This will be skipped if we have cached data
+        self.session_manager.process_document(session)
+
+        # Get the pipeline with processed data
+        pipeline = session.get_pipeline()
+
+        if pipeline is None:
+            raise RuntimeError(f"Failed to get pipeline for session {file_id}")
+
+        # Handle request using the cached pipeline
+        result = handler.handle(pipeline, params)
+
+        return result
+
