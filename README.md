@@ -92,6 +92,12 @@ Training Data → Finetuning (LoRA/QLoRA) → Improved Model
 ### Model Setup (Local Models)
 
 ```bash
+```bash
+# 0. Setup (one-time, also creates aivenv, hop into that venv)
+./setup_mcp_server.sh 
+
+source aivenv/bin/activate
+
 # 1. Install dependencies
 pip install -r requirements.txt
 
@@ -114,19 +120,17 @@ huggingface-cli download TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF \
   tinyllama-1.1b-chat.Q4_K_M.gguf \
   --local-dir models/ --local-dir-use-symlinks False
 
-### MCP Server (Recommended - Web Interface)
+### (MCP Server - Web Interface)
 
 ```bash
-# 1. Setup (one-time)
-./setup_mcp_server.sh
 
-# 2. Start the MCP server
+# 1. Start the MCP server
 ./start_mcp_server.sh
 
-# 3. Start the frontend (in new terminal)
+# 2. Start the frontend (in new terminal)
 ./start_frontend.sh
 
-# 4. Open browser to http://localhost:8080
+# 3. Open browser to http://localhost:8080
 # Upload documents, generate study materials!
 ```
 
